@@ -1,0 +1,21 @@
+# 1. Environment variables
+.env
+
+# 2. Virtual Environment 
+venv/
+env/
+Scripts/
+
+# 3. Python Cache 
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# 4. OS generated files
+.DS_Store
+Thumbs.db
+
+# 5. Database lokal (Jika sewaktu-waktu lu testing pakai SQLite)
+*.sqlite3
+*.db
