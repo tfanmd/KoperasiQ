@@ -7,7 +7,7 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Endpoint pertama kita (mirip Route::get('/') di Laravel)
+# Endpoint pertama (mirip Route::get('/') di Laravel)
 @app.get("/")
 def read_root():
     return {
