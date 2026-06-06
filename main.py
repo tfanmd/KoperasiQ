@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
-
+from typing import List
 from database import engine, get_db
 import models
 import schemas
@@ -36,3 +36,15 @@ def create_member(member: schemas.MemberCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(new_member)
     return new_member
+
+@app.get("/api/members/", response_model=List[schemas.MemberResponse])
+def get_members(search: str = None, db: Session = Depends(get_db)):
+    # endpoint untuk mendapatkan daftar member, dengan fitur pencarian berdasarkan nama atau nomor identitas
+    if search:
+        members = db.query(models.Member).filter(
+            models.Member.name.ilike(f"%{search}%") |
+            models.Member.identity_no.ilike(f"%{search}%")
+        ).all()
+    else:
+        members = db.query(models.Member).limit(50).all()
+    return members
