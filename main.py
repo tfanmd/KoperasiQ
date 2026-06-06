@@ -37,6 +37,20 @@ def create_member(member: schemas.MemberCreate, db: Session = Depends(get_db)):
     db.refresh(new_member)
     return new_member
 
+# endpoint untuk menambahkan petugas
+@app.post("/api/users/", response_model=schemas.UserResponse)
+def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
+    # endpoint user baru
+    db_user = db.query(models.User).filter(models.User.username == user.username).first()
+    if db_user:
+        raise HTTPException(status_code=400, detail="Username sudah digunakan")
+    
+    new_user = models.User(username=user.username, password_hash=user.password, role=user.role)
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    return new_user
+
 @app.get("/api/members/", response_model=List[schemas.MemberResponse])
 def get_members(search: str = None, db: Session = Depends(get_db)):
     # endpoint untuk mendapatkan daftar member, dengan fitur pencarian berdasarkan nama atau nomor identitas
