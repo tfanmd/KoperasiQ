@@ -24,4 +24,16 @@ class DistributionResponse(BaseModel):
     user_id: UUID
     date: datetime
 
+# schema utk barang
+class ProductCreate(BaseModel):
+    name: str
+    stock: int
+    unit: str # contoh: kg, liter, pcs
+
+class ProductResponse(BaseModel):
+    id: UUID
+    name: str
+    stock: int
+    unit: str
+
     model_config = ConfigDict(from_attributes=True)
