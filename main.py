@@ -49,7 +49,7 @@ def get_members(search: str = None, db: Session = Depends(get_db)):
         members = db.query(models.Member).limit(50).all()
     return members
 
-@app.post("api/products/", response_model=schemas.ProductResponse)
+@app.post("/api/products/", response_model=schemas.ProductResponse)
 def create_product(product: schemas.ProductCreate, db: Session = Depends(get_db)):
     # endpoint untuk membuat produk baru
     new_product = models.Product(name=product.name, stock=product.stock, unit=product.unit)
