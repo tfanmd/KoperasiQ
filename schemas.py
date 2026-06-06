@@ -36,4 +36,15 @@ class ProductResponse(BaseModel):
     stock: int
     unit: str
 
+# schema utk user(petugas)
+class UserCreate(BaseModel):
+    username: str
+    password: str
+    role: str = "petugas"  # default role adalah admin
+
+class UserResponse(BaseModel):
+    id: UUID
+    username: str
+    role: str
+
     model_config = ConfigDict(from_attributes=True)
