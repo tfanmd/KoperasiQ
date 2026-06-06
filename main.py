@@ -48,3 +48,18 @@ def get_members(search: str = None, db: Session = Depends(get_db)):
     else:
         members = db.query(models.Member).limit(50).all()
     return members
+
+@app.post("api/products/", response_model=schemas.ProductResponse)
+def create_product(product: schemas.ProductCreate, db: Session = Depends(get_db)):
+    # endpoint untuk membuat produk baru
+    new_product = models.Product(name=product.name, stock=product.stock, unit=product.unit)
+    db.add(new_product)
+    db.commit()
+    db.refresh(new_product)
+    return new_product
+
+@app.get("/api/products/", response_model=List[schemas.ProductResponse])
+def get_products(db: Session = Depends(get_db)):
+    # endpoint untuk mendapatkan daftar produk
+    products = db.query(models.Product).all()
+    return products
