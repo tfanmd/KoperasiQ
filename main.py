@@ -64,49 +64,107 @@ def get_members(search: str = None, db: Session = Depends(get_db)):
         members = db.query(models.Member).limit(50).all()
     return members
 
-@app.post("/api/products/", response_model=schemas.ProductResponse)
+# endpoint untuk product (katalog barang) - untuk menambahkan item baru ke katalog dan melihat daftar katalog yang tersedia
+@app.post("/api/products", response_model=schemas.ProductResponse)
 def create_product(product: schemas.ProductCreate, db: Session = Depends(get_db)):
-    # endpoint untuk membuat produk baru
-    new_product = models.Product(name=product.name, stock=product.stock, unit=product.unit)
+    """Menambahkan item katalog baru (Satuan / Paketan)"""
+    new_product = models.Product(
+        name=product.name,
+        category=product.category,
+        type=product.type,
+        unit=product.unit
+    )
     db.add(new_product)
     db.commit()
     db.refresh(new_product)
     return new_product
 
-@app.get("/api/products/", response_model=List[schemas.ProductResponse])
+@app.get("/api/products", response_model=List[schemas.ProductResponse])
 def get_products(db: Session = Depends(get_db)):
-    # endpoint untuk mendapatkan daftar produk
-    products = db.query(models.Product).all()
-    return products
+    """Melihat daftar menu/katalog yang bisa dipilih anggota"""
+    return db.query(models.Product).all()
 
 # endpoint transaction
-@app.post("/api/distributions/", response_model=schemas.DistributionResponse)
-def create_distribution(dist: schemas.DistributionCreate, db: Session = Depends(get_db)):
-    # endpoint untuk membuat distribusi baru
-    member = db.query(models.Member).filter(models.Member.id == dist.member_id).first()
+@app.post("/api/distributions", response_model=schemas.DistributionResponse)
+def create_distribution(order: schemas.DistributionCreate, db: Session = Depends(get_db)):
+    """Anggota memilih barang dan mengirim pesanan ke sistem (Status: Pending)"""
+    
+    # Validasi 1: Pastikan anggota ada dan belum pernah ambil sembako
+    member = db.query(models.Member).filter(models.Member.id == order.member_id).first()
     if not member:
-        raise HTTPException(status_code=404, detail="Data anggota tidak ditemukan")
+        raise HTTPException(status_code=404, detail="Data anggota tidak ditemukan!")
     if member.status == True:
-        raise HTTPException(status_code=400, detail="Anggota sudah mengambil sebelumnya")
-    try:
-        new_distribution = models.Distribution(member_id=dist.member_id, user_id=dist.user_id)
-        db.add(new_distribution)
-        member.status = True
-        products = db.query(models.Product).all()
-        for product in products:
-            if product.stock <= 0:
-                raise ValueError(f"Stok produk {product.name} habis")
-            product.stock -= 1
-        db.commit()
-        db.refresh(new_distribution)
+        raise HTTPException(status_code=400, detail="DITOLAK: Anggota ini SUDAH mengambil paket sembako!")
 
-        return new_distribution
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        db.rollback()
-        print(f"ERROR ASLINYA ADALAH: {str(e)}")
+    try:
+        # A. Buat nota induknya dulu
+        new_dist = models.Distribution(
+            member_id=order.member_id,
+            status="pending"
+            # user_id sengaja dibiarkan kosong (NULL) karena belum diproses petugas
+        )
+        db.add(new_dist)
         
-        # 2. Kirim pesan error aslinya ke Swagger UI
-        raise HTTPException(status_code=500, detail=f"Error Internal: {str(e)}")
+        # MAGIC TRICK: db.flush() digunakan agar PostgreSQL meng-generate ID nota (new_dist.id) 
+        # tanpa harus melakukan commit (simpan permanen) dulu. Kita butuh ID ini untuk keranjang.
+        db.flush() 
+
+        # B. Masukkan isi keranjang (list barang) satu per satu
+        for item in order.items:
+            new_detail = models.DistributionDetail(
+                distribution_id=new_dist.id, # Pake ID nota yang baru aja dibuat
+                product_id=item.product_id,
+                quantity=item.quantity
+            )
+            db.add(new_detail)
+
+        # C. Simpan semuanya secara permanen
+        db.commit()
+        db.refresh(new_dist)
+        return new_dist
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Gagal memproses pesanan: {str(e)}")
+    
+# 2. PETUGAS MENGONFIRMASI PESANAN (ACC)
+@app.put("/api/distributions/{dist_id}/confirm", response_model=schemas.DistributionResponse)
+def confirm_distribution(dist_id: str, user_id: str, db: Session = Depends(get_db)):
+    """Petugas mengecek keranjang dan klik ACC (Status: Confirmed)"""
+    
+    dist = db.query(models.Distribution).filter(models.Distribution.id == dist_id).first()
+    if not dist:
+        raise HTTPException(status_code=404, detail="Nota pesanan tidak ditemukan!")
+    if dist.status != "pending":
+        raise HTTPException(status_code=400, detail=f"Gagal! Pesanan ini berstatus: {dist.status}")
+
+    # Stamp ID petugas ke nota ini dan ubah status
+    dist.user_id = user_id
+    dist.status = "confirmed"
+    
+    db.commit()
+    db.refresh(dist)
+    return dist
+
+# 3. PETUGAS MENYERAHKAN BARANG FISIK (SELESAI)
+@app.put("/api/distributions/{dist_id}/complete", response_model=schemas.DistributionResponse)
+def complete_distribution(dist_id: str, db: Session = Depends(get_db)):
+    """Petugas menyerahkan fisik sembako dan menutup transaksi (Status: Completed)"""
+    
+    dist = db.query(models.Distribution).filter(models.Distribution.id == dist_id).first()
+    if not dist:
+        raise HTTPException(status_code=404, detail="Nota pesanan tidak ditemukan!")
+    if dist.status != "confirmed":
+        raise HTTPException(status_code=400, detail="Gagal! Pesanan harus di-ACC (Confirmed) terlebih dahulu!")
+
+    # A. Ubah status nota menjadi selesai
+    dist.status = "completed"
+
+    # B. Gembok akun anggota agar tidak bisa pesan lagi (status = True)
+    member = db.query(models.Member).filter(models.Member.id == dist.member_id).first()
+    if member:
+        member.status = True
+
+    db.commit()
+    db.refresh(dist)
+    return dist
