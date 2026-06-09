@@ -1,7 +1,27 @@
 from pydantic import BaseModel, ConfigDict
 from uuid import UUID
 from datetime import datetime
+from typing import List, Optional
 
+# ==========================================
+# SKEMA UNTUK PETUGAS (USER)
+# ==========================================
+class UserCreate(BaseModel):
+    username: str
+    password: str 
+    role: str = "petugas"
+
+class UserResponse(BaseModel):
+    id: UUID
+    username: str
+    role: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ==========================================
+# SKEMA UNTUK ANGGOTA (MEMBER)
+# ==========================================
 class MemberCreate(BaseModel):
     name: str
     identity_no: str
@@ -11,40 +31,57 @@ class MemberResponse(BaseModel):
     name: str
     identity_no: str
     status: bool
-    # ubah format database ke json
+
     model_config = ConfigDict(from_attributes=True)
 
-class DistributionCreate(BaseModel):
-    user_id: UUID
-    member_id: UUID
 
-class DistributionResponse(BaseModel):
-    id: UUID
-    member_id: UUID
-    user_id: UUID
-    date: datetime
-
-# schema utk barang
+# ==========================================
+# SKEMA UNTUK KATALOG BARANG (PRODUCT)
+# ==========================================
 class ProductCreate(BaseModel):
     name: str
-    stock: int
-    unit: str # contoh: kg, liter, pcs
+    category: str  # Contoh: "Bahan Pokok", "Minuman"
+    type: str      # Contoh: "satuan", "paketan"
+    unit: str      # Contoh: "kg", "liter", "pcs", "paket"
 
 class ProductResponse(BaseModel):
     id: UUID
     name: str
-    stock: int
+    category: str
+    type: str
     unit: str
 
-# schema utk user(petugas)
-class UserCreate(BaseModel):
-    username: str
-    password: str
-    role: str = "petugas"  # default role adalah admin
+    model_config = ConfigDict(from_attributes=True)
 
-class UserResponse(BaseModel):
+
+# ==========================================
+# SKEMA TRANSAKSI & KERANJANG (DISTRIBUTION)
+# ==========================================
+
+# 1. Skema untuk item di dalam keranjang belanja
+class DistributionItemCreate(BaseModel):
+    product_id: UUID
+    quantity: int = 1
+
+class DistributionItemResponse(BaseModel):
     id: UUID
-    username: str
-    role: str
+    product_id: UUID
+    quantity: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+# 2. Skema saat Anggota pertama kali membuat pesanan/PO
+class DistributionCreate(BaseModel):
+    member_id: UUID
+    items: List[DistributionItemCreate] # Menerima ARRAY dari barang yang dipilih
+
+# 3. Skema Response Lengkap (Rangkuman Pesanan yang akan dilihat Petugas)
+class DistributionResponse(BaseModel):
+    id: UUID
+    member_id: UUID
+    user_id: Optional[UUID] = None # Bisa bernilai null jika status masih pending
+    status: str                    # "pending", "confirmed", "completed"
+    date: datetime
+    details: List[DistributionItemResponse] # Menampilkan list barang yang diambil
 
     model_config = ConfigDict(from_attributes=True)
