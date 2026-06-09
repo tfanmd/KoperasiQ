@@ -51,6 +51,7 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     db.refresh(new_user)
     return new_user
 
+# endpoint untuk mendapatkan daftar member, dengan fitur pencarian berdasarkan nama atau nomor identitas
 @app.get("/api/members/", response_model=List[schemas.MemberResponse])
 def get_members(search: str = None, db: Session = Depends(get_db)):
     # endpoint untuk mendapatkan daftar member, dengan fitur pencarian berdasarkan nama atau nomor identitas
@@ -77,3 +78,35 @@ def get_products(db: Session = Depends(get_db)):
     # endpoint untuk mendapatkan daftar produk
     products = db.query(models.Product).all()
     return products
+
+# endpoint transaction
+@app.post("/api/distributions/", response_model=schemas.DistributionResponse)
+def create_distribution(dist: schemas.DistributionCreate, db: Session = Depends(get_db)):
+    # endpoint untuk membuat distribusi baru
+    member = db.query(models.Member).filter(models.Member.id == dist.member_id).first()
+    if not member:
+        raise HTTPException(status_code=404, detail="Data anggota tidak ditemukan")
+    if member.status == True:
+        raise HTTPException(status_code=400, detail="Anggota sudah mengambil sebelumnya")
+    try:
+        new_distribution = models.Distribution(member_id=dist.member_id, user_id=dist.user_id)
+        db.add(new_distribution)
+        member.status = True
+        products = db.query(models.Product).all()
+        for product in products:
+            if product.stock <= 0:
+                raise ValueError(f"Stok produk {product.name} habis")
+            product.stock -= 1
+        db.commit()
+        db.refresh(new_distribution)
+
+        return new_distribution
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        db.rollback()
+        print(f"ERROR ASLINYA ADALAH: {str(e)}")
+        
+        # 2. Kirim pesan error aslinya ke Swagger UI
+        raise HTTPException(status_code=500, detail=f"Error Internal: {str(e)}")
