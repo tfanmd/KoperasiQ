@@ -1,32 +1,40 @@
-from passlib.context import CryptContext
+import os
+import bcrypt # Kita pakai bcrypt langsung tanpa passlib
 import jwt
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
-import os
 
-load_dotenv()  
-# konfigurasi hashing password
+# ==========================================
+# KONFIGURASI KEAMANAN
+# ==========================================
+load_dotenv()
+
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# 1. Fungsi untuk nge-hash password baru
+def get_password_hash(password: str):
+    # Bcrypt butuh format 'bytes', jadi string-nya kita encode dulu
+    pwd_bytes = password.encode('utf-8')
+    salt = bcrypt.gensalt()
+    hashed_password = bcrypt.hashpw(pwd_bytes, salt)
+    
+    # Kembalikan jadi string biar gampang disimpan di database PostgreSQL
+    return hashed_password.decode('utf-8')
 
-# fungsi untuk hashing password baru
-def get_password_hash(password):
-    return pwd_context.hash(password)
-
-# fungsi untuk memverifikasi password saat login
+# 2. Fungsi untuk mengecek password saat login
 def verify_password(plain_password: str, hashed_password: str):
-    return pwd_context.verify(plain_password, hashed_password)
+    # Keduanya harus diubah ke bytes dulu sebelum diadu
+    password_byte_enc = plain_password.encode('utf-8')
+    hashed_password_byte_enc = hashed_password.encode('utf-8')
+    
+    return bcrypt.checkpw(password_byte_enc, hashed_password_byte_enc)
 
-# fungsi untuk membuat token JWT saat login berhasil
+# 3. Fungsi untuk mencetak tiket masuk (Token JWT)
 def create_access_token(data: dict):
     to_encode = data.copy()
-    
     expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
-
-    # encode data menjadi token JWT
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt

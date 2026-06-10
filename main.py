@@ -39,16 +39,20 @@ def create_member(member: schemas.MemberCreate, db: Session = Depends(get_db)):
     return new_member
 
 # endpoint untuk menambahkan petugas
-@app.post("/api/users/", response_model=schemas.UserResponse)
+@app.post("/api/users", response_model=schemas.UserResponse)
 def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
-    # endpoint user baru
+    """Mendaftarkan petugas dengan password yang sudah di-hash"""
     db_user = db.query(models.User).filter(models.User.username == user.username).first()
     if db_user:
-        raise HTTPException(status_code=400, detail="Username sudah digunakan")
-    
+        raise HTTPException(status_code=400, detail="Username sudah terdaftar!")
+
     hashed_pwd = security.get_password_hash(user.password)
 
-    new_user = models.User(username=user.username, password_hash=hashed_pwd, role=user.role)
+    new_user = models.User(
+        username=user.username,
+        password_hash=hashed_pwd, # Simpan versi acaknya
+        role=user.role
+    )
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
