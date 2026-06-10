@@ -1,7 +1,7 @@
 import token
 
 from fastapi import FastAPI, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from typing import List
 from database import engine, get_db
@@ -90,14 +90,17 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
 
 # endpoint untuk login petugas
 @app.post("/api/login", response_model=schemas.Token)
-def login(user_credentials: schemas.UserLogin, db: Session = Depends(get_db)):
+def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     "Verifikasi login dan send JWT token kalau berhasil"
-    user = db.query(models.User).filter(models.User.username == user_credentials.username).first()
-
-    if not user or not security.verify_password(user_credentials.password, user.password_hash):
-        raise HTTPException(status_code=401, detail="Username atau password salah!")
+    user = db.query(models.User).filter(models.User.username == form_data.username).first()
     
+    # B. Cek apakah user ada dan passwordnya cocok
+    if not user or not security.verify_password(form_data.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Username atau password salah!")
+
+    # C. Kalau cocok, cetak tiket JWT
     access_token = security.create_access_token(data={"sub": str(user.id)})
+    
     return {"access_token": access_token, "token_type": "bearer"}
 
 # endpoint untuk mendapatkan daftar member, dengan fitur pencarian berdasarkan nama atau nomor identitas
