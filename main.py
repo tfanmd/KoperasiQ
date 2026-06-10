@@ -68,6 +68,11 @@ def get_members(search: str = None, db: Session = Depends(get_db)):
 @app.post("/api/products", response_model=schemas.ProductResponse)
 def create_product(product: schemas.ProductCreate, db: Session = Depends(get_db)):
     """Menambahkan item katalog baru (Satuan / Paketan)"""
+# filter untuk mencegah duplikasi nama produk
+    existing_product = db.query(models.Product).filter(models.Product.name == product.name).first()
+    if existing_product:
+        raise HTTPException(status_code=400, detail="Produk dengan nama ini sudah ada!")
+    
     new_product = models.Product(
         name=product.name, 
         category=product.category,  
