@@ -1,12 +1,42 @@
-from fastapi import FastAPI, Depends, HTTPException
+import token
+
+from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from typing import List
 from database import engine, get_db
+import jwt
 import models
 import schemas
 import security
 
+app = FastAPI()
+
 models.Base.metadata.create_all(bind=engine)  # Membuat tabel di database jika belum ada
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/login")  # URL endpoint untuk login (mendapatkan token)
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):   
+    "Middleware untuk memverifikasi token JWT dan mendapatkan data user yang sedang login"
+    # Pesan Error
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Token tidak valid atau sudah kadaluarsa!",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+    try:
+        payload = jwt.decode(token, security.SECRET_KEY, algorithms=[security.ALGORITHM])
+        user_id: str = payload.get("sub")
+        if user_id is None:
+            raise credentials_exception
+        
+    except jwt.PyJWTError:
+        raise credentials_exception
+    
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if user is None:
+        raise credentials_exception
+    
+    return user
 # Inisiasi aplikasi FastAPI
 app = FastAPI(
     title="API Koperasi Sembako",
