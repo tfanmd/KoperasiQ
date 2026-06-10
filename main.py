@@ -69,8 +69,8 @@ def get_members(search: str = None, db: Session = Depends(get_db)):
 def create_product(product: schemas.ProductCreate, db: Session = Depends(get_db)):
     """Menambahkan item katalog baru (Satuan / Paketan)"""
     new_product = models.Product(
-        name=product.name,
-        category=product.category,
+        name=product.name, 
+        category=product.category,  
         type=product.type,
         unit=product.unit
     )
