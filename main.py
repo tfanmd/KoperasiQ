@@ -186,7 +186,12 @@ def create_distribution(order: schemas.DistributionCreate, db: Session = Depends
     
 # 2. PETUGAS MENGONFIRMASI PESANAN (ACC)
 @app.put("/api/distributions/{dist_id}/confirm", response_model=schemas.DistributionResponse)
-def confirm_distribution(dist_id: str, user_id: str, db: Session = Depends(get_db)):
+def confirm_distribution(
+    dist_id: str, 
+    user_id: str, 
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
     """Petugas mengecek keranjang dan klik ACC (Status: Confirmed)"""
     
     dist = db.query(models.Distribution).filter(models.Distribution.id == dist_id).first()
@@ -195,8 +200,8 @@ def confirm_distribution(dist_id: str, user_id: str, db: Session = Depends(get_d
     if dist.status != "pending":
         raise HTTPException(status_code=400, detail=f"Gagal! Pesanan ini berstatus: {dist.status}")
 
-    # Stamp ID petugas ke nota ini dan ubah status
-    dist.user_id = user_id
+    # Otomatis catat ID petugas berdasarkan siapa yang sedang login pakai token ini!
+    dist.user_id = current_user.id 
     dist.status = "confirmed"
     
     db.commit()
@@ -205,7 +210,11 @@ def confirm_distribution(dist_id: str, user_id: str, db: Session = Depends(get_d
 
 # 3. PETUGAS MENYERAHKAN BARANG FISIK (SELESAI)
 @app.put("/api/distributions/{dist_id}/complete", response_model=schemas.DistributionResponse)
-def complete_distribution(dist_id: str, db: Session = Depends(get_db)):
+def complete_distribution(
+    dist_id: str, 
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
     """Petugas menyerahkan fisik sembako dan menutup transaksi (Status: Completed)"""
     
     dist = db.query(models.Distribution).filter(models.Distribution.id == dist_id).first()
