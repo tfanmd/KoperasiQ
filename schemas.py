@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from uuid import UUID
 from datetime import datetime
 from typing import List, Optional
@@ -8,7 +8,7 @@ from typing import List, Optional
 # ==========================================
 class UserCreate(BaseModel):
     username: str
-    password: str 
+    password: str = Field(..., max_length=72)  # Validasi minimal panjang password
     role: str = "petugas"
 
 class UserResponse(BaseModel):
