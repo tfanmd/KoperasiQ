@@ -176,3 +176,22 @@ def complete_distribution(dist_id: str, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(dist)
     return dist
+
+# endpoint untuk melihat daftar pesanan, dengan opsi filter berdasarkan status (pending / confirmed / completed)
+@app.get("/api/distributions", response_model=List[schemas.DistributionResponse])
+def get_distributions(status: str = None, db: Session = Depends(get_db)):
+    """
+    Menampilkan daftar pesanan. 
+    Bisa difilter berdasarkan status (pending / confirmed / completed).
+    """
+    # Mulai query dasar
+    query = db.query(models.Distribution)
+    
+    # Kalau Frontend minta filter status tertentu (misal cuma mau lihat yang "pending")
+    if status:
+        query = query.filter(models.Distribution.status == status)
+        
+    # Tampilkan dari yang paling baru diorder (descending)
+    distributions = query.order_by(models.Distribution.date.desc()).all()
+    
+    return distributions
